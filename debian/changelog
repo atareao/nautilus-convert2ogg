@@ -1,8 +1,8 @@
-nautilus-convert2ogg (0.0.3.0-1ubuntu0) xenial; urgency=medium
+nautilus-convert2ogg (0.0.3.2-1ubuntu0) xenial; urgency=medium
 
   * idleobject and progress dialog
 
- -- Lorenzo Carbonell <lorenzo.carbonell.cerezo@gmail.com>  Mon, 21 Nov 2016 21:17:33 +0100
+ -- Lorenzo Carbonell <lorenzo.carbonell.cerezo@gmail.com>  Tue, 22 Nov 2016 07:42:46 +0100
 
 nautilus-convert2ogg (0.0.2.2-1ubuntu2) wily; urgency=medium
 

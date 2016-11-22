@@ -41,7 +41,7 @@ from gi.repository import GLib
 from gi.repository import Nautilus as FileManager
 
 
-EXTENSIONS_FROM = ['.mp3', '.wav', '.mp4', '.flv']
+EXTENSIONS_FROM = ['.mp3', '.wav', '.mp4', '.flv', '.mkv']
 SEPARATOR = u'\u2015' * 10
 
 _ = str
@@ -63,7 +63,7 @@ class DoItInBackground(IdleObject, Thread):
     __gsignals__ = {
         'started': (GObject.SIGNAL_RUN_FIRST, GObject.TYPE_NONE, ()),
         'ended': (GObject.SIGNAL_RUN_FIRST, GObject.TYPE_NONE, (bool,)),
-        'done_one': (GObject.SIGNAL_RUN_FIRST, GObject.TYPE_NONE, ()),
+        'done_one': (GObject.SIGNAL_RUN_FIRST, GObject.TYPE_NONE, (str,)),
     }
 
     def __init__(self, what_to_do, elements):
@@ -86,7 +86,7 @@ class DoItInBackground(IdleObject, Thread):
                     self.ok = False
                     break
                 self.what_to_do(element)
-                self.emit('done_one')
+                self.emit('done_one', element)
         except Exception as e:
             self.ok = False
         self.emit('ended', self.ok)
@@ -151,8 +151,8 @@ class Progreso(Gtk.Dialog):
     def close(self, *args):
         self.destroy()
 
-    def increase(self, anobject, command, *args):
-        self.label.set_text(_('Executing: %s') % command)
+    def increase(self, anobject, element, *args):
+        self.label.set_text(_('Converting: %s') % element)
         self.value += 1.0
         fraction = self.value/self.max_value
         self.progressbar.set_fraction(fraction)
@@ -225,7 +225,7 @@ class OGGConvereterMenuProvider(GObject.GObject, FileManager.MenuProvider):
         progreso = Progreso(_('Convert to ogg'), None, len(files))
         diib.connect('done_one', progreso.increase)
         diib.connect('ended', progreso.close)
-        progreso.connect('i-want-stop', diib.stopit)
+        progreso.connect('i-want-stop', diib.stop)
         diib.start()
 
     def get_file_items(self, window, sel_items):
