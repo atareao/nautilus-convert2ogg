@@ -39,11 +39,14 @@ from gi.repository import GObject
 from gi.repository import Gtk
 from gi.repository import GLib
 from gi.repository import Nautilus as FileManager
+import re
+
+APPNAME = 'nautilus-convert2ogg'
+ICON = 'nautilus-convert2ogg'
+VERSION = '0.4.0'
 
 
 EXTENSIONS_FROM = ['.mp3', '.wav', '.mp4', '.flv', '.mkv']
-SEPARATOR = u'\u2015' * 10
-
 _ = str
 
 
@@ -61,49 +64,81 @@ class IdleObject(GObject.GObject):
 
 class DoItInBackground(IdleObject, Thread):
     __gsignals__ = {
-        'started': (GObject.SIGNAL_RUN_FIRST, GObject.TYPE_NONE, ()),
+        'started': (GObject.SIGNAL_RUN_FIRST, GObject.TYPE_NONE, (int,)),
         'ended': (GObject.SIGNAL_RUN_FIRST, GObject.TYPE_NONE, (bool,)),
-        'done_one': (GObject.SIGNAL_RUN_FIRST, GObject.TYPE_NONE, (str,)),
+        'start_one': (GObject.SIGNAL_RUN_FIRST, GObject.TYPE_NONE, (str,)),
+        'end_one': (GObject.SIGNAL_RUN_FIRST, GObject.TYPE_NONE, (float,)),
     }
 
-    def __init__(self, what_to_do, elements):
+    def __init__(self, elements):
         IdleObject.__init__(self)
         Thread.__init__(self)
-        self.what_to_do = what_to_do
         self.elements = elements
         self.stopit = False
         self.ok = True
         self.daemon = True
+        self.process = None
 
     def stop(self, *args):
         self.stopit = True
 
+    def convert2ogg(self, file_in):
+        tmp_file_out = tempfile.NamedTemporaryFile(
+            prefix='tmp_convert2ogg_file_', dir='/tmp/').name
+        tmp_file_out += '.ogg'
+        rutine = 'ffmpeg -i "%s" -vn -acodec libvorbis -y "%s"' % (
+            file_in, tmp_file_out)
+        args = shlex.split(rutine)
+        self.process = subprocess.Popen(args, stdout=subprocess.PIPE)
+        out, err = self.process.communicate()
+        print(out, err)
+        file_out = get_output_filename(file_in)
+        if os.path.exists(file_out):
+            os.remove(file_out)
+        shutil.copyfile(tmp_file_out, file_out)
+        if os.path.exists(tmp_file_out):
+            os.remove(tmp_file_out)
+
     def run(self):
-        self.emit('started')
+        total = 0
+        for element in self.elements:
+            total += get_duration(element)
+        self.emit('started', total)
         try:
+            total = 0
             for element in self.elements:
                 if self.stopit is True:
                     self.ok = False
                     break
-                self.what_to_do(element)
-                self.emit('done_one', element)
+                self.emit('start_one', element)
+                self.convert2ogg(element)
+                self.emit('end_one', get_duration(element))
         except Exception as e:
             self.ok = False
+        try:
+            if self.process is not None:
+                self.process.terminate()
+                self.process = None
+        except Exception as e:
+            print(e)
         self.emit('ended', self.ok)
 
 
-class Progreso(Gtk.Dialog):
+class Progreso(Gtk.Dialog, IdleObject):
     __gsignals__ = {
         'i-want-stop': (GObject.SIGNAL_RUN_FIRST, GObject.TYPE_NONE, ()),
     }
 
-    def __init__(self, title, parent, max_value):
-        Gtk.Dialog.__init__(self, title, parent)
+    def __init__(self, title, parent):
+        Gtk.Dialog.__init__(self, title, parent,
+                            Gtk.DialogFlags.MODAL |
+                            Gtk.DialogFlags.DESTROY_WITH_PARENT)
+        IdleObject.__init__(self)
         self.set_position(Gtk.WindowPosition.CENTER_ALWAYS)
         self.set_size_request(330, 30)
         self.set_resizable(False)
         self.connect('destroy', self.close)
-        # self.set_modal(True)
+        self.set_modal(True)
         vbox = Gtk.VBox(spacing=5)
         vbox.set_border_width(5)
         self.get_content_area().add(vbox)
@@ -138,8 +173,11 @@ class Progreso(Gtk.Dialog):
                      xoptions=Gtk.AttachOptions.SHRINK)
         self.stop = False
         self.show_all()
-        self.max_value = max_value
+        self.max_value = float(max_value)
         self.value = 0.0
+
+    def set_max_value(self, anobject, max_value):
+        self.max_value = float(max_value)
 
     def get_stop(self):
         return self.stop
@@ -151,13 +189,15 @@ class Progreso(Gtk.Dialog):
     def close(self, *args):
         self.destroy()
 
-    def increase(self, anobject, element, *args):
-        self.label.set_text(_('Converting: %s') % element)
-        self.value += 1.0
+    def increase(self, anobject, value):
+        self.value += float(value)
         fraction = self.value/self.max_value
         self.progressbar.set_fraction(fraction)
-        if self.value == self.max_value:
+        if self.value >= self.max_value:
             self.hide()
+
+    def set_element(self, anobject, element):
+        self.label.set_text(_('Converting: %s') % element)
 
 
 def get_output_filename(file_in):
@@ -167,25 +207,28 @@ def get_output_filename(file_in):
     return file_out
 
 
-def convert2ogg(file_in):
-    tmp_file_out = tempfile.NamedTemporaryFile(
-        prefix='tmp_convert2ogg_file_', dir='/tmp/').name
-    tmp_file_out += '.ogg'
-    rutine = 'ffmpeg -i "%s" \
-    -acodec libvorbis \
-    -ac 2 \
-    -b:a 64k \
-    -ar 22000 \
-    "%s"' % (file_in, tmp_file_out)
+def get_duration(file_in):
+    rutine = 'ffmpeg -i "%s" -f null -' % (file_in)
     args = shlex.split(rutine)
-    p = subprocess.Popen(args, stdout=subprocess.PIPE)
-    out, err = p.communicate()
-    file_out = get_output_filename(file_in)
-    if os.path.exists(file_out):
-        os.remove(file_out)
-    shutil.copyfile(tmp_file_out, file_out)
-    if os.path.exists(tmp_file_out):
-        os.remove(tmp_file_out)
+    p = subprocess.Popen(args,
+                         stdout=subprocess.PIPE,
+                         stdin=subprocess.PIPE,
+                         stderr=subprocess.PIPE)
+    p.stdin.write('q')
+    out1 = p.stdout.read()
+    err1 = p.stderr.read()
+    out2, err2 = p.communicate()
+    try:
+        if len(out1) > 0:
+            out = out1
+        elif len(err1) > 0:
+            out = err1
+        ans = re.search('Duration: \d+:\d\d:\d\d.\d\d', out).group().split(':')
+        ans = float(ans[1]) * 3600.0 + float(ans[2]) * 60.0 + float(ans[3])
+    except Exception as e:
+        print(e)
+        ans = 300
+    return ans
 
 
 def get_files(files_in):
@@ -219,14 +262,17 @@ class OGGConvereterMenuProvider(GObject.GObject, FileManager.MenuProvider):
                 return True
         return False
 
-    def convert(self, menu, selected):
+    def convert(self, menu, selected, window):
         files = get_files(selected)
-        diib = DoItInBackground(convert2ogg, files)
-        progreso = Progreso(_('Convert to ogg'), None, len(files))
-        diib.connect('done_one', progreso.increase)
+        diib = DoItInBackground(files)
+        progreso = Progreso(_('Convert to ogg'), window, len(files))
+        diib.connect('started', progreso.set_max_value)
+        diib.connect('start_one', progreso.set_element)
+        diib.connect('end_one', progreso.increase)
         diib.connect('ended', progreso.close)
         progreso.connect('i-want-stop', diib.stop)
         diib.start()
+        progreso.run()
 
     def get_file_items(self, window, sel_items):
         """
@@ -236,14 +282,64 @@ class OGGConvereterMenuProvider(GObject.GObject, FileManager.MenuProvider):
         """
         if self.all_files_are_sounds(sel_items):
             top_menuitem = FileManager.MenuItem(
-                name='OGGConverterMenuProvider::Gtk-ogg-tools',
+                name='OGGConverterMenuProvider::Gtk-convert2ogg-top',
                 label=_('Convert to ogg'),
                 tip=_('Tool to convert to ogg'))
-            top_menuitem.connect('activate', self.convert, sel_items)
+            submenu = FileManager.Menu()
+            top_menuitem.set_submenu(submenu)
+
+            sub_menuitem_00 = FileManager.MenuItem(
+                name='OGGConverterMenuProvider::Gtk-convert2ogg-sub-01',
+                label=_('Convert'),
+                tip=_('Tool to convert to ogg'))
+            sub_menuitem_00.connect('activate',
+                                    self.convert,
+                                    sel_items,
+                                    window)
+            submenu.append_item(sub_menuitem_00)
+            sub_menuitem_01 = FileManager.MenuItem(
+                name='OGGConverterMenuProvider::Gtk-convert2ogg-sub-02',
+                label=_('About'),
+                tip=_('About'))
+            sub_menuitem_01.connect('activate', self.about, window)
+            submenu.append_item(sub_menuitem_01)
             #
             return top_menuitem,
         return
+
+    def about(self, widget, window):
+        ad = Gtk.AboutDialog(parent=window)
+        ad.set_name(APPNAME)
+        ad.set_version(VERSION)
+        ad.set_copyright('Copyrignt (c) 2016\nLorenzo Carbonell')
+        ad.set_comments(APPNAME)
+        ad.set_license('''
+This program is free software: you can redistribute it and/or modify it under
+the terms of the GNU General Public License as published by the Free Software
+Foundation, either version 3 of the License, or (at your option) any later
+version.
+
+This program is distributed in the hope that it will be useful, but WITHOUT
+ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License along with
+this program. If not, see <http://www.gnu.org/licenses/>.
+''')
+        ad.set_website('http://www.atareao.es')
+        ad.set_website_label('http://www.atareao.es')
+        ad.set_authors([
+            'Lorenzo Carbonell <lorenzo.carbonell.cerezo@gmail.com>'])
+        ad.set_documenters([
+            'Lorenzo Carbonell <lorenzo.carbonell.cerezo@gmail.com>'])
+        ad.set_icon_name(ICON)
+        ad.set_logo_icon_name(APPNAME)
+        ad.run()
+        ad.destroy()
+
 if __name__ == '__main__':
     print(tempfile.NamedTemporaryFile(
         prefix='tmp_convert2ogg_file', dir='/tmp/').name)
     print(get_output_filename('ejemplo.ext'))
+    print('--', get_duration('/home/lorenzo/temporal/sofia.mp4'), '--')
+    print('--', get_duration('/home/lorenzo/temporal/Alvaro Soler - Sofia-qaZ0oAh4evU.mkv'), '--')
