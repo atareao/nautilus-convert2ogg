@@ -1,6 +1,6 @@
 # convert2ogg
 
-![CodeFactor](https://www.codefactor.io/repository/github/signalr/signalr/    badge?style=plastic)
+![CodeFactor](https://www.codefactor.io/repository/github/signalr/signalr/badge?style=plastic)
 
 <img src="./data/nautilus-convert2ogg.svg" align="right"
      title="Nautilus Convert MP3" width="128" height="128">
