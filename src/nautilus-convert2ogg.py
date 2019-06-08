@@ -3,7 +3,7 @@
 #
 # This file is part of nautilus-convert2ogg
 #
-# Copyright (C) 2012-2016 Lorenzo Carbonell
+# Copyright (C) 2012-2019 Lorenzo Carbonell
 # lorenzo.carbonell.cerezo@gmail.com
 #
 # This program is free software: you can redistribute it and/or modify
@@ -18,9 +18,7 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
-#
-#
-#
+
 import gi
 try:
     gi.require_version('Gtk', '3.0')
@@ -83,8 +81,9 @@ class DoItInBackground(IdleObject, Thread):
         self.stopit = True
 
     def convert2ogg(self, file_in):
+        temdir = tempfile.gettempdir()
         tmp_file_out = tempfile.NamedTemporaryFile(
-            prefix='tmp_convert2ogg_file_', dir='/tmp/').name
+            prefix='tmp_convert2ogg_file_', dir=tempdir).name
         tmp_file_out += '.ogg'
         rutine = 'ffmpeg -i "%s" -vn -acodec libvorbis -y "%s"' % (
             file_in, tmp_file_out)
@@ -173,7 +172,6 @@ class Progreso(Gtk.Dialog, IdleObject):
                      xoptions=Gtk.AttachOptions.SHRINK)
         self.stop = False
         self.show_all()
-        self.max_value = float(max_value)
         self.value = 0.0
 
     def set_max_value(self, anobject, max_value):
@@ -219,9 +217,9 @@ def get_duration(file_in):
     err1 = p.stderr.read()
     out2, err2 = p.communicate()
     try:
-        if len(out1) > 0:
+        if out1:
             out = out1
-        elif len(err1) > 0:
+        elif err1:
             out = err1
         ans = re.search('Duration: \d+:\d\d:\d\d.\d\d', out).group().split(':')
         ans = float(ans[1]) * 3600.0 + float(ans[2]) * 60.0 + float(ans[3])
@@ -265,7 +263,7 @@ class OGGConvereterMenuProvider(GObject.GObject, FileManager.MenuProvider):
     def convert(self, menu, selected, window):
         files = get_files(selected)
         diib = DoItInBackground(files)
-        progreso = Progreso(_('Convert to ogg'), window, len(files))
+        progreso = Progreso(_('Convert to ogg'), window)
         diib.connect('started', progreso.set_max_value)
         diib.connect('start_one', progreso.set_element)
         diib.connect('end_one', progreso.increase)
@@ -311,7 +309,7 @@ class OGGConvereterMenuProvider(GObject.GObject, FileManager.MenuProvider):
         ad = Gtk.AboutDialog(parent=window)
         ad.set_name(APPNAME)
         ad.set_version(VERSION)
-        ad.set_copyright('Copyrignt (c) 2016\nLorenzo Carbonell')
+        ad.set_copyright('Copyrignt (c) 2019\nLorenzo Carbonell')
         ad.set_comments(APPNAME)
         ad.set_license('''
 This program is free software: you can redistribute it and/or modify it under
@@ -336,10 +334,3 @@ this program. If not, see <http://www.gnu.org/licenses/>.
         ad.set_logo_icon_name(APPNAME)
         ad.run()
         ad.destroy()
-
-if __name__ == '__main__':
-    print(tempfile.NamedTemporaryFile(
-        prefix='tmp_convert2ogg_file', dir='/tmp/').name)
-    print(get_output_filename('ejemplo.ext'))
-    print('--', get_duration('/home/lorenzo/temporal/sofia.mp4'), '--')
-    print('--', get_duration('/home/lorenzo/temporal/Alvaro Soler - Sofia-qaZ0oAh4evU.mkv'), '--')
