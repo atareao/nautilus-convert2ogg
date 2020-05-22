@@ -8,12 +8,15 @@ Homepage: http://www.atareao.es
 
 Package: nautilus-convert2ogg
 Architecture: all
-Depends: ${misc:Depends}, ${python:Depends},
-	python,
-	python-gi,
-	python-cairo,
-	gir1.2-nautilus-3.0,
-	python-nautilus,
-	ffmpeg
+Depends:
+    python3,
+    python3-gi,
+    python3-nautilus,
+    python3-plumbum,
+    gir1.2-nautilus-3.0,
+    gir1.2-gtk-3.0,
+    gir1.2-gtk-3.0,
+    nanecalib,
+    ffmpeg
 Description: An extension for Nautilus to convert sound files to ogg
  An extension for Nautilus to convert sound files to ogg from menu

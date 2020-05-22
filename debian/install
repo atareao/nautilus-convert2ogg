@@ -1,2 +1,2 @@
-src/nautilus-convert2ogg.py /usr/share/nautilus-python/extensions
-data/nautilus-convert2ogg.svg /usr/share/icons/gnome/scalable/apps
+src/*.py /usr/share/nautilus-python/extensions
+data/icons/hicolor /usr/share/icons

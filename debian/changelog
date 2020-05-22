@@ -1,8 +1,17 @@
-nautilus-convert2ogg (0.3.0-0extras19.04.0) xenial; urgency=medium
+nautilus-convert2ogg (0.4.0-0extras20.04.0) focal; urgency=medium
+
+  * Improved icons
+  * Using multiprocessor
+  * Using plumbum
+
+ -- Lorenzo Carbonell <lorenzo.carbonell.cerezo@gmail.com>  Fri, 22 May 2020 20:46:56 +0200
+
+nautilus-convert2ogg (0.3.0-0extras19.04.0) disco; urgency=medium
 
   * updated icon
+  * minor changes
 
- -- Lorenzo Carbonell <lorenzo.carbonell.cerezo@gmail.com>  Sat, 08 Jun 2019 08:57:05 +0200
+ -- Lorenzo Carbonell <lorenzo.carbonell.cerezo@gmail.com>  Sat, 08 Jun 2019 21:15:45 +0200
 
 nautilus-convert2ogg (0.1.4-1ubuntu0) xenial; urgency=medium
 
